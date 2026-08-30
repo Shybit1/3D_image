@@ -1,0 +1,93 @@
+model:
+  name: midas_small
+  checkpoint_path: models/checkpoints/midas_v21_small_256.pt
+  device: auto
+  input_size: 256
+
+inference:
+  tile_size: 1024
+  overlap: 64
+  max_full_image_side: 2048
+
+calibration:
+  method: linear_robust
+  min_reference_points: 8
+
+uncertainty:
+  method: multi_scale_ensemble
+  num_passes: 8
+
+visualization:
+  max_mesh_resolution: 200
+  vertical_exaggeration: 1.0
+
+# AeroTwin AI Phase 1 -- video ingestion / quality / keyframe selection.
+# See src/depthwizard/utils/config.py:VideoConfig for field docs.
+video:
+  max_video_size_mb: 2048
+  max_duration_seconds: 180.0
+  allowed_extensions: [".mp4", ".mov", ".avi", ".mkv"]
+  thumbnail_size: [320, 180]
+
+  analysis_fps: 4.0
+
+  blur_weight: 0.30
+  exposure_weight: 0.20
+  contrast_weight: 0.15
+  feature_weight: 0.20
+  motion_weight: 0.15
+  min_acceptable_quality: 0.15
+
+  novelty_weight: 0.35
+  feature_richness_weight: 0.20
+  quality_weight: 0.20
+  coverage_gain_weight: 0.15
+  redundancy_weight: 0.30
+  information_score_threshold: 0.35
+  min_keyframe_spacing_seconds: 0.15
+  max_keyframes: 200
+  min_keyframes_warning: 15
+
+# AeroTwin AI Phase 2 -- COLMAP orchestration (Module 4/55).
+# COLMAP is an external binary, not a pip package. `executable` may be a
+# bare command resolved via PATH, or a full path if not on PATH.
+colmap:
+  executable: "C:/Users/chinn/Desktop/hack2/COLMAP/bin/colmap.exe"
+  camera_model: "SIMPLE_RADIAL"
+  single_camera: true
+  matcher: "sequential"   # sequential (video, temporal-order filenames) | exhaustive
+  use_gpu: false           # CPU SIFT default; enable only if COLMAP was built with a usable GPU context
+  timeout_seconds: 600.0
+
+# AeroTwin AI Phase 2 -- reconstruction quality gating (Module 5).
+# Heuristic thresholds, not calibrated against a labeled dataset -- tune
+# once real footage/ground truth is available.
+reconstruction_quality:
+  good_registration_rate: 0.85
+  fair_registration_rate: 0.55
+  good_reprojection_error: 1.5
+  fair_reprojection_error: 3.0
+  min_points_for_dense: 500
+
+# AeroTwin AI Phase 6 -- semantic understanding (Module 16/50).
+# HEURISTIC classifier, not a trained model -- see semantics/segmenter.py
+# module docstring for why (network policy blocked pretrained weight
+# download in this environment, and stock COCO/VOC classes don't fit
+# aerial imagery anyway). Swappable behind SemanticSegmenter interface.
+semantic:
+  building_height_threshold: 2.5
+  ground_opening_kernel: 15
+  vegetation_hue_low: 35
+  vegetation_hue_high: 95
+  vegetation_min_saturation: 40
+  water_hue_low: 95
+  water_hue_high: 135
+  water_max_local_std: 6.0
+  road_max_saturation: 40
+  road_max_local_std: 8.0
+  texture_window: 5
+  confidence_weight_ground: 1.0
+  confidence_weight_vegetation: 0.6
+  confidence_weight_building: 1.0
+  confidence_weight_road: 1.0
+  confidence_weight_water: 0.5

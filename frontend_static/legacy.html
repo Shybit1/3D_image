@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:,">
+<title>DepthWizard-X · Legacy Single-Image Mode</title>
+<style>
+  :root{
+    --bg: #0a0d10;
+    --panel: #10151a;
+    --panel-raised: #141a20;
+    --line: #232b32;
+    --text: #dfe6ea;
+    --text-dim: #7c8891;
+    --accent: #5ec8f2;
+    --accent-dim: #2f5b6e;
+    --warn: #e8a860;
+    --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    --sans: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); overflow:hidden; }
+
+  .app { display:grid; grid-template-rows: 48px 1fr 40px; height:100%; }
+
+  header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 16px; border-bottom:1px solid var(--line); background:var(--panel);
+  }
+  .brand { display:flex; align-items:baseline; gap:10px; }
+  .brand .mark { font-family:var(--mono); font-size:13px; letter-spacing:0.18em; color:var(--accent); }
+  .brand h1 { font-size:14px; font-weight:600; margin:0; letter-spacing:0.02em; }
+  .brand .sub { font-size:11px; color:var(--text-dim); font-family:var(--mono); }
+  .hw-badge { display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:11px; color:var(--text-dim); border:1px solid var(--line); padding:4px 10px; }
+  .hw-dot { width:6px; height:6px; border-radius:50%; background:var(--text-dim); }
+  .hw-dot.ready { background:var(--accent); box-shadow:0 0 6px var(--accent); }
+
+  .body { display:grid; grid-template-columns: 280px 1fr 300px; height:100%; overflow:hidden; }
+
+  .panel { background:var(--panel); border-right:1px solid var(--line); overflow-y:auto; padding:16px; }
+  .panel.right { border-right:none; border-left:1px solid var(--line); }
+
+  .section-label { font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--text-dim); text-transform:uppercase; margin:18px 0 8px; }
+  .section-label:first-child { margin-top:0; }
+
+  .dropzone {
+    border:1px dashed var(--line); padding:22px 12px; text-align:center; cursor:pointer;
+    font-size:12px; color:var(--text-dim); transition:border-color .15s, color .15s;
+  }
+  .dropzone:hover { border-color:var(--accent-dim); color:var(--text); }
+  .dropzone.has-file { border-style:solid; border-color:var(--accent-dim); color:var(--text); }
+  input[type=file]{ display:none; }
+
+  .mode-row { display:flex; gap:0; border:1px solid var(--line); }
+  .mode-btn { flex:1; padding:8px 0; font-family:var(--mono); font-size:11px; background:transparent; color:var(--text-dim); border:none; cursor:pointer; border-right:1px solid var(--line); }
+  .mode-btn:last-child{ border-right:none; }
+  .mode-btn.active { background:var(--accent-dim); color:var(--text); }
+
+  .toggle-row { display:flex; align-items:center; justify-content:space-between; font-size:12px; padding:6px 0; color:var(--text-dim); }
+  .toggle-row input { accent-color: var(--accent); }
+
+  button.primary {
+    width:100%; padding:11px; margin-top:16px; background:var(--accent); color:#04141a; border:none;
+    font-family:var(--mono); font-size:12px; letter-spacing:0.08em; font-weight:600; cursor:pointer;
+    text-transform:uppercase;
+  }
+  button.primary:disabled { background:var(--line); color:var(--text-dim); cursor:not-allowed; }
+
+  .log { margin-top:14px; font-family:var(--mono); font-size:10.5px; color:var(--text-dim); line-height:1.6; max-height:180px; overflow-y:auto; }
+  .log .ok { color:var(--accent); }
+  .log .err { color:#e8735f; }
+
+  .viewer-wrap { position:relative; background:#050708; overflow:hidden; }
+  #canvas-host { width:100%; height:100%; display:block; }
+  .viewer-hud { position:absolute; top:10px; left:12px; font-family:var(--mono); font-size:10.5px; color:var(--text-dim); pointer-events:none; line-height:1.7; }
+  .viewer-hud b { color:var(--text); }
+  .viewer-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px; color:var(--text-dim); font-size:12px; text-align:center; }
+  .viewer-empty .big { font-family:var(--mono); font-size:11px; letter-spacing:0.14em; color:var(--line); }
+  .view-modes { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); display:flex; gap:1px; border:1px solid var(--line); }
+  .view-modes button { font-family:var(--mono); font-size:10px; padding:6px 12px; background:var(--panel); color:var(--text-dim); border:none; border-right:1px solid var(--line); cursor:pointer; }
+  .view-modes button:last-child{ border-right:none; }
+  .view-modes button.active { color:var(--accent); background:var(--panel-raised); }
+  .view-modes button:disabled { color:#3a4249; cursor:not-allowed; }
+
+  .legend { position:absolute; bottom:52px; left:50%; transform:translateX(-50%); display:none;
+    flex-direction:column; align-items:center; font-family:var(--mono); font-size:9.5px; color:var(--text-dim); }
+  .legend .bar { width:220px; height:8px; border:1px solid var(--line); }
+  .legend .scale { display:flex; justify-content:space-between; width:220px; margin-top:3px; }
+  .legend .caption { margin-top:3px; color:var(--warn); display:none; }
+  .legend .caption.show { display:block; }
+
+  .stratum-row { display:flex; justify-content:space-between; align-items:center; font-family:var(--mono); font-size:10.5px; padding:4px 0; border-bottom:1px solid var(--line); color:var(--text-dim); }
+  .stratum-row .name { color:var(--text); text-transform:capitalize; }
+  .stratum-row .frac { color:var(--text-dim); font-size:9.5px; }
+  .stratum-row .rmse { color:var(--text); }
+  .stratum-row.skipped .rmse { color:var(--text-dim); font-style:italic; }
+
+  .readout { display:flex; justify-content:space-between; font-family:var(--mono); font-size:11.5px; padding:5px 0; border-bottom:1px solid var(--line); color:var(--text-dim); }
+  .readout b { color:var(--text); font-weight:400; }
+  .readout .val { color:var(--text); }
+
+  .badge-note { font-size:10.5px; color:var(--text-dim); margin-top:4px; line-height:1.5; }
+  .badge-note.warn { color:var(--warn); }
+
+  footer.metrics {
+    display:flex; align-items:center; gap:28px; padding:0 16px; border-top:1px solid var(--line);
+    background:var(--panel); font-family:var(--mono); font-size:11px; color:var(--text-dim);
+  }
+  footer.metrics .m b { color:var(--text); margin-right:6px; }
+  footer.metrics .status-not-evaluated { color:var(--warn); }
+</style>
+</head>
+<body style="display:flex;flex-direction:column;">
+<div style="flex:0 0 auto;background:#141a20;border-bottom:1px solid #232b32;color:#7c8891;font-family:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;font-size:11px;padding:6px 16px;display:flex;align-items:center;gap:8px;">
+  <span>LEGACY MODULE &middot; DepthWizard-X single-image / satellite DSM pipeline</span>
+  <a href="/" style="margin-left:auto;color:#5ec8f2;text-decoration:none;">&larr; Back to AeroTwin AI</a>
+</div>
+<div class="app" style="flex:1 1 auto;height:auto;min-height:0;">
+
+  <header>
+    <div class="brand">
+      <span class="mark">DWX</span>
+      <h1>DEPTHWIZARD-X</h1>
+      <span class="sub">Single-View Satellite → 3D Digital Environment · SIH26175</span>
+    </div>
+    <div class="hw-badge"><span class="hw-dot" id="hw-dot"></span><span id="hw-label">Hardware: checking…</span></div>
+  </header>
+
+  <div class="body">
+
+    <div class="panel">
+      <div class="section-label">Input</div>
+      <div class="dropzone" id="dropzone">
+        Drop a PNG / JPG / GeoTIFF here<br>or click to browse
+        <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.bmp,.tif,.tiff" />
+      </div>
+      <div class="badge-note" id="file-info"></div>
+
+      <div class="section-label">Mode</div>
+      <div class="mode-row">
+        <button class="mode-btn active" data-mode="relative">Relative DSM</button>
+        <button class="mode-btn" data-mode="absolute">Absolute DSM</button>
+      </div>
+      <div class="badge-note" id="mode-note">No spatial metadata required. Elevation is unitless, scaled for visualization.</div>
+
+      <div id="ref-dem-row" style="display:none; margin-top:10px;">
+        <div class="dropzone" id="ref-dropzone" style="padding:14px 10px; font-size:11px;">
+          Drop reference DEM/DSM GeoTIFF (for calibration)
+          <input type="file" id="ref-file-input" accept=".tif,.tiff" />
+        </div>
+        <div class="badge-note" id="ref-file-info"></div>
+
+        <div class="badge-note" style="margin-top:8px;">No reference DEM? Try one of these instead:</div>
+
+        <details style="margin-top:6px;">
+          <summary style="cursor:pointer; font-family:var(--mono); font-size:10.5px; color:var(--text-dim);">Ground control points (GCPs)</summary>
+          <div style="margin-top:6px; display:flex; gap:4px;">
+            <input type="number" id="gcp-row" placeholder="row (px)" style="width:33%;">
+            <input type="number" id="gcp-col" placeholder="col (px)" style="width:33%;">
+            <input type="number" id="gcp-elev" placeholder="elev (m)" style="width:33%;">
+          </div>
+          <button id="gcp-add-btn" style="margin-top:4px; width:100%; font-size:10px;">Add point</button>
+          <div id="gcp-list" style="margin-top:4px; font-family:var(--mono); font-size:9.5px; color:var(--text-dim);"></div>
+          <div class="badge-note" style="margin-top:4px;">Needs ≥8 points; ≥16 lets us report an independent holdout RMSE.</div>
+        </details>
+
+        <details style="margin-top:6px;">
+          <summary style="cursor:pointer; font-family:var(--mono); font-size:10.5px; color:var(--text-dim);">Shadow-length calibration</summary>
+          <div style="margin-top:6px; display:flex; gap:4px;">
+            <input type="number" id="sun-elev" placeholder="sun elevation °" style="width:50%;">
+            <input type="number" id="sun-azimuth" placeholder="sun azimuth °" style="width:50%;">
+          </div>
+          <div class="badge-note" style="margin-top:4px;">Needs visible cast shadows and a north-up image.</div>
+        </details>
+      </div>
+
+      <div class="toggle-row">
+        <span>Compute uncertainty (multi-scale ensemble)</span>
+        <input type="checkbox" id="unc-toggle" checked />
+      </div>
+
+      <button class="primary" id="reconstruct-btn" disabled>Reconstruct</button>
+
+      <div class="log" id="log"></div>
+    </div>
+
+    <div class="viewer-wrap">
+      <div id="canvas-host"></div>
+      <div class="viewer-empty" id="viewer-empty">
+        <div class="big">// NO RECONSTRUCTION LOADED</div>
+        <div>Upload an image and run Reconstruct to generate a navigable 3D terrain mesh.</div>
+      </div>
+      <div class="viewer-hud" id="viewer-hud" style="display:none;">
+        <div>cursor elev: <b id="hud-elev">—</b></div>
+        <div>vertices: <b id="hud-verts">—</b></div>
+        <div>drag: orbit · scroll: zoom</div>
+      </div>
+      <div class="legend" id="legend">
+        <div class="bar" id="legend-bar"></div>
+        <div class="scale"><span id="legend-min">—</span><span id="legend-mid">—</span><span id="legend-max">—</span></div>
+        <div class="caption" id="legend-caption">approximate — no metric CRS</div>
+      </div>
+      <div class="view-modes" id="view-modes" style="display:none;">
+        <button class="active" data-view="height">Height</button>
+        <button data-view="slope">Slope</button>
+        <button data-view="uncertainty">Uncertainty</button>
+        <button data-view="error" disabled title="Requires a successful absolute-mode calibration against a reference DEM">Error</button>
+        <button data-view="wireframe">Wireframe</button>
+        <button data-view="texture">Texture</button>
+      </div>
+    </div>
+
+    <div class="panel right">
+      <div class="section-label">Model</div>
+      <div class="readout"><span>Backbone</span><span class="val" id="r-model">—</span></div>
+      <div class="readout"><span>Device</span><span class="val" id="r-device">—</span></div>
+      <div class="readout"><span>Output type</span><span class="val" id="r-output">—</span></div>
+      <div class="readout"><span>Refinement</span><span class="val" id="r-refine">—</span></div>
+
+      <div class="section-label">Analysis</div>
+      <div class="readout"><span>Mesh vertices</span><span class="val" id="r-verts">—</span></div>
+      <div class="readout"><span>Mesh faces</span><span class="val" id="r-faces">—</span></div>
+      <div class="readout"><span>Uncertainty computed</span><span class="val" id="r-unc">—</span></div>
+      <div class="readout"><span>Uncertainty↔error corr.</span><span class="val" id="r-unc-corr">—</span></div>
+      <div class="readout"><span>Holdout / calib. pixels</span><span class="val" id="r-holdout">—</span></div>
+
+      <div class="section-label" id="strat-label" style="display:none;">Terrain-stratified validation</div>
+      <div id="strat-panel"></div>
+
+      <div class="section-label">Notes</div>
+      <div class="badge-note" id="notes-box">Awaiting a reconstruction job.</div>
+    </div>
+
+  </div>
+
+  <footer class="metrics" id="metrics-bar">
+    <div class="m"><b>RMSE</b><span id="m-rmse">—</span></div>
+    <div class="m"><b>MAE</b><span id="m-mae">—</span></div>
+    <div class="m"><b>Correlation</b><span id="m-corr">—</span></div>
+    <div class="m"><b>Inference</b><span id="m-time">—</span></div>
+    <div class="m" id="m-status"></div>
+  </footer>
+
+</div>
+
+<script src="/vendor/three.min.js"></script>
+<script>
+const API = "/api";
+const els = {
+  dropzone: document.getElementById('dropzone'),
+  fileInput: document.getElementById('file-input'),
+  fileInfo: document.getElementById('file-info'),
+  reconstructBtn: document.getElementById('reconstruct-btn'),
+  log: document.getElementById('log'),
+  modeNote: document.getElementById('mode-note'),
+  hwDot: document.getElementById('hw-dot'),
+  hwLabel: document.getElementById('hw-label'),
+  viewerEmpty: document.getElementById('viewer-empty'),
+  viewerHud: document.getElementById('viewer-hud'),
+  viewModes: document.getElementById('view-modes'),
+  hudElev: document.getElementById('hud-elev'),
+  hudVerts: document.getElementById('hud-verts'),
+  legend: document.getElementById('legend'),
+  legendBar: document.getElementById('legend-bar'),
+  legendMin: document.getElementById('legend-min'),
+  legendMid: document.getElementById('legend-mid'),
+  legendMax: document.getElementById('legend-max'),
+  legendCaption: document.getElementById('legend-caption'),
+  stratLabel: document.getElementById('strat-label'),
+  stratPanel: document.getElementById('strat-panel'),
+};
+
+let state = {
+  fileId: null, mode: 'relative', uncertaintyMap: null, textureUrl: null, referenceDemFileId: null,
+  slopeMap: null, errorMap: null, pixelSizeIsMetric: false, gcpPoints: [],
+};
+
+function logLine(msg, cls) {
+  const d = document.createElement('div');
+  d.textContent = msg;
+  if (cls) d.className = cls;
+  els.log.appendChild(d);
+  els.log.scrollTop = els.log.scrollHeight;
+}
+
+// ---- upload ----
+els.dropzone.addEventListener('click', () => els.fileInput.click());
+els.dropzone.addEventListener('dragover', e => { e.preventDefault(); });
+els.dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+els.fileInput.addEventListener('change', e => {
+  if (e.target.files.length) handleFile(e.target.files[0]);
+});
+
+async function handleFile(file) {
+  logLine(`Uploading ${file.name}...`);
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const res = await fetch(`${API}/upload`, { method: 'POST', body: form });
+    if (!res.ok) { const t = await res.json(); throw new Error(t.detail || res.statusText); }
+    const data = await res.json();
+    state.fileId = data.file_id;
+    els.dropzone.classList.add('has-file');
+    els.fileInfo.textContent =
+      `${data.width}×${data.height}px · ${data.is_georeferenced ? 'georeferenced (' + (data.crs || 'CRS present') + ')' : 'non-georeferenced'}`;
+    els.reconstructBtn.disabled = false;
+    logLine(`Upload OK · file_id=${data.file_id}`, 'ok');
+  } catch (err) {
+    logLine(`Upload failed: ${err.message}`, 'err');
+  }
+}
+
+// ---- reference DEM upload (for absolute mode) ----
+const refDropzone = document.getElementById('ref-dropzone');
+const refFileInput = document.getElementById('ref-file-input');
+refDropzone.addEventListener('click', () => refFileInput.click());
+refDropzone.addEventListener('dragover', e => e.preventDefault());
+refDropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  if (e.dataTransfer.files.length) handleReferenceFile(e.dataTransfer.files[0]);
+});
+refFileInput.addEventListener('change', e => {
+  if (e.target.files.length) handleReferenceFile(e.target.files[0]);
+});
+
+async function handleReferenceFile(file) {
+  logLine(`Uploading reference DEM ${file.name}...`);
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const res = await fetch(`${API}/upload-reference`, { method: 'POST', body: form });
+    if (!res.ok) { const t = await res.json(); throw new Error(t.detail || res.statusText); }
+    const data = await res.json();
+    state.referenceDemFileId = data.file_id;
+    refDropzone.classList.add('has-file');
+    document.getElementById('ref-file-info').textContent = `${data.width}×${data.height}px · CRS ${data.crs}`;
+    logLine(`Reference DEM uploaded · file_id=${data.file_id}`, 'ok');
+  } catch (err) {
+    logLine(`Reference DEM upload failed: ${err.message}`, 'err');
+  }
+}
+
+// ---- mode ----
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.mode = btn.dataset.mode;
+    const refRow = document.getElementById('ref-dem-row');
+    if (state.mode === 'absolute') {
+      refRow.style.display = 'block';
+      els.modeNote.textContent = 'Requires a georeferenced input plus a reference DEM/DSM GeoTIFF below for calibration. Falls back to relative DSM (with an explicit warning) if no reference is supplied — never fabricated.';
+    } else {
+      refRow.style.display = 'none';
+      els.modeNote.textContent = 'No spatial metadata required. Elevation is unitless, scaled for visualization.';
+    }
+  });
+});
+
+// ---- ground control points ----
+document.getElementById('gcp-add-btn').addEventListener('click', () => {
+  const row = parseInt(document.getElementById('gcp-row').value, 10);
+  const col = parseInt(document.getElementById('gcp-col').value, 10);
+  const elev = parseFloat(document.getElementById('gcp-elev').value);
+  if (Number.isNaN(row) || Number.isNaN(col) || Number.isNaN(elev)) {
+    logLine('GCP point needs numeric row, col, and elevation_m.', 'err');
+    return;
+  }
+  state.gcpPoints.push({ row, col, elevation_m: elev });
+  renderGcpList();
+  document.getElementById('gcp-row').value = '';
+  document.getElementById('gcp-col').value = '';
+  document.getElementById('gcp-elev').value = '';
+});
+
+function renderGcpList() {
+  const box = document.getElementById('gcp-list');
+  if (state.gcpPoints.length === 0) { box.innerHTML = ''; return; }
+  box.innerHTML = state.gcpPoints.map((p, i) =>
+    `<div>#${i + 1} (${p.row}, ${p.col}) → ${p.elevation_m}m <a href="#" data-i="${i}" class="gcp-remove" style="color:var(--warn);">✕</a></div>`
+  ).join('') + `<div style="margin-top:2px;">${state.gcpPoints.length} point(s) supplied.</div>`;
+  box.querySelectorAll('.gcp-remove').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      state.gcpPoints.splice(parseInt(a.dataset.i, 10), 1);
+      renderGcpList();
+    });
+  });
+}
+
+// ---- reconstruct ----
+els.reconstructBtn.addEventListener('click', runReconstruction);
+
+async function runReconstruction() {
+  if (!state.fileId) return;
+  els.reconstructBtn.disabled = true;
+  const computeUnc = document.getElementById('unc-toggle').checked;
+  const sunElevVal = parseFloat(document.getElementById('sun-elev').value);
+  const sunAzVal = parseFloat(document.getElementById('sun-azimuth').value);
+  logLine('Submitting reconstruction job...');
+  try {
+    const res = await fetch(`${API}/reconstruct`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        file_id: state.fileId, mode: state.mode, compute_uncertainty: computeUnc,
+        reference_dem_file_id: state.mode === 'absolute' ? state.referenceDemFileId : null,
+        gcp_points: (state.mode === 'absolute' && state.gcpPoints.length > 0) ? state.gcpPoints : null,
+        sun_elevation_deg: (state.mode === 'absolute' && !Number.isNaN(sunElevVal)) ? sunElevVal : null,
+        sun_azimuth_deg: (state.mode === 'absolute' && !Number.isNaN(sunAzVal)) ? sunAzVal : null,
+      })
+    });
+    const job = await res.json();
+    logLine(`Job queued: ${job.job_id}`);
+    await pollJob(job.job_id);
+  } catch (err) {
+    logLine(`Reconstruction failed: ${err.message}`, 'err');
+    els.reconstructBtn.disabled = false;
+  }
+}
+
+async function pollJob(jobId) {
+  for (let i = 0; i < 120; i++) {
+    const res = await fetch(`${API}/job/${jobId}`);
+    const status = await res.json();
+    if (status.status === 'completed') {
+      logLine(`Completed · stage=${status.stage}`, 'ok');
+      await loadResults(jobId);
+      els.reconstructBtn.disabled = false;
+      return;
+    }
+    if (status.status === 'failed') {
+      logLine(`Job failed: ${status.error}`, 'err');
+      els.reconstructBtn.disabled = false;
+      return;
+    }
+    logLine(`... ${status.stage || status.status}`);
+    await new Promise(r => setTimeout(r, 700));
+  }
+  logLine('Timed out waiting for job.', 'err');
+  els.reconstructBtn.disabled = false;
+}
+
+async function loadResults(jobId) {
+  // Reset per-job layer state so a previous job's slope/error/uncertainty
+  // data can never be shown against this job's mesh.
+  state.uncertaintyMap = null;
+  state.slopeMap = null;
+  state.errorMap = null;
+  state.pixelSizeIsMetric = false;
+
+  const [mesh, metadata, metrics] = await Promise.all([
+    fetch(`${API}/mesh/${jobId}`).then(r => r.json()),
+    fetch(`${API}/metadata/${jobId}`).then(r => r.json()),
+    fetch(`${API}/metrics/${jobId}`).then(r => r.json()),
+  ]);
+
+  document.getElementById('r-model').textContent = metadata.model_name;
+  document.getElementById('r-device').textContent = metadata.device_used;
+  document.getElementById('r-output').textContent = metadata.is_absolute ? 'Absolute (meters)' : 'Relative (unitless)';
+  document.getElementById('r-refine').textContent = metadata.refinement_applied ? 'Edge-aware bilateral filter applied' : 'None';
+  document.getElementById('r-verts').textContent = mesh.vertex_count.toLocaleString();
+  document.getElementById('r-faces').textContent = mesh.face_count.toLocaleString();
+  document.getElementById('r-unc').textContent = metadata.uncertainty_time_s ? `yes (${metadata.uncertainty_time_s}s, real ensemble std)` : 'no';
+  document.getElementById('r-unc-corr').textContent = (metrics.uncertainty_error_correlation !== null && metrics.uncertainty_error_correlation !== undefined)
+    ? metrics.uncertainty_error_correlation.toFixed(3) : '—';
+  document.getElementById('r-holdout').textContent = (metrics.holdout_pixel_count != null)
+    ? `${metrics.holdout_pixel_count.toLocaleString()} / ${metrics.calibration_pixel_count.toLocaleString()}` : '—';
+
+  document.getElementById('m-rmse').textContent = metrics.status === 'evaluated' ? metrics.rmse.toFixed(3) : 'Not evaluated';
+  document.getElementById('m-mae').textContent = metrics.status === 'evaluated' ? metrics.mae.toFixed(3) : 'Not evaluated';
+  document.getElementById('m-corr').textContent = metrics.status === 'evaluated' ? metrics.correlation.toFixed(3) : 'Not evaluated';
+  document.getElementById('m-time').textContent = `${metadata.total_time_s}s`;
+  document.getElementById('m-status').textContent = metrics.note || '';
+  document.getElementById('m-status').className = metrics.status === 'not_evaluated' ? 'm status-not-evaluated' : 'm';
+
+  renderTerrainStratification(metrics.terrain_stratification);
+
+  const notesBox = document.getElementById('notes-box');
+  if (metadata.calibration_warning) {
+    notesBox.textContent = metadata.calibration_warning;
+    notesBox.classList.add('warn');
+  } else if (metadata.calibration_method) {
+    const sourceLabels = {
+      reference_dem: 'reference DEM', offline_srtm_cache: `offline SRTM (${(metadata.srtm_tiles_used||[]).join(', ')})`,
+      gcp_points: `${metadata.gcp_points_used} GCP point(s)`, shadow_length_cue: `${metadata.shadow_regions_used} shadow anchor(s)`,
+    };
+    const src = sourceLabels[metadata.calibration_source] || metadata.calibration_source || 'unknown source';
+    let extra = '';
+    if (metadata.calibration_source === 'gcp_points' && metadata.gcp_holdout_rmse_m != null) {
+      extra = ` · holdout RMSE ${metadata.gcp_holdout_rmse_m}m (${metadata.gcp_holdout_points} pts)`;
+    }
+    notesBox.textContent = `Calibrated via ${src} · ${metadata.calibration_points_used} fit points · r=${metadata.calibration_r} · residual RMSE ${metadata.calibration_rmse_m}m${extra}`;
+    notesBox.classList.remove('warn');
+  } else {
+    notesBox.textContent = metadata.synthetic_demo
+      ? 'SYNTHETIC DEMONSTRATION scene — not real satellite imagery.'
+      : `Reconstructed from uploaded imagery in ${metadata.total_time_s}s on ${metadata.device_used}.`;
+  }
+
+  if (metadata.uncertainty_time_s) {
+    try {
+      const uncRes = await fetch(`${API}/uncertainty/${jobId}`);
+      state.uncertaintyMap = await uncRes.json();
+    } catch (e) { /* uncertainty optional */ }
+  }
+
+  // Slope layer: always attempted, does not require a reference DEM.
+  try {
+    const slopeRes = await fetch(`${API}/slope/${jobId}`);
+    if (slopeRes.ok) {
+      state.slopeMap = await slopeRes.json();
+      state.pixelSizeIsMetric = !!state.slopeMap.pixel_size_is_metric_calibrated;
+    }
+  } catch (e) { /* slope optional */ }
+
+  // Error map + terrain stratification map: only exist when metrics.status === 'evaluated'.
+  const errorBtn = document.querySelector('.view-modes button[data-view="error"]');
+  if (metrics.status === 'evaluated') {
+    try {
+      const errRes = await fetch(`${API}/error-map/${jobId}`);
+      if (errRes.ok) {
+        state.errorMap = await errRes.json();
+        errorBtn.disabled = false;
+        errorBtn.title = 'Signed error (predicted − reference), meters';
+      }
+    } catch (e) { /* error map optional */ }
+  } else {
+    errorBtn.disabled = true;
+    errorBtn.title = 'Requires a successful absolute-mode calibration against a reference DEM';
+  }
+
+  state.textureUrl = `${API}/texture/${jobId}`;
+
+  els.viewerEmpty.style.display = 'none';
+  els.viewerHud.style.display = 'block';
+  els.viewModes.style.display = 'flex';
+  els.hudVerts.textContent = mesh.vertex_count.toLocaleString();
+
+  buildScene(mesh);
+  updateLegend('height', mesh);
+}
+
+function renderTerrainStratification(strat) {
+  if (!strat || !strat.classes) {
+    els.stratLabel.style.display = 'none';
+    els.stratPanel.innerHTML = '';
+    return;
+  }
+  els.stratLabel.style.display = 'block';
+  const methodNote = strat.method === 'heuristic_rgb_dem_classifier'
+    ? '<div class="badge-note warn" style="margin-bottom:6px;">Heuristic RGB/DEM classifier (no ground-truth land-cover mask supplied) — treat as approximate.</div>'
+    : '<div class="badge-note" style="margin-bottom:6px;">Classified from a supplied land-cover mask.</div>';
+
+  const order = ['urban', 'hilly', 'forested', 'sparse'];
+  let rows = '';
+  for (const name of order) {
+    const c = strat.classes[name];
+    if (!c) continue;
+    const pct = (c.pixel_fraction * 100).toFixed(1);
+    if (c.status === 'evaluated') {
+      rows += `<div class="stratum-row"><span class="name">${name}</span><span class="frac">${pct}% px</span><span class="rmse">RMSE ${c.rmse.toFixed(2)}m</span></div>`;
+    } else {
+      rows += `<div class="stratum-row skipped"><span class="name">${name}</span><span class="frac">${pct}% px</span><span class="rmse">insufficient px</span></div>`;
+    }
+  }
+  els.stratPanel.innerHTML = methodNote + rows;
+}
+
+// ---- three.js viewer ----
+let renderer, scene, camera, mesh3d, raycaster, mouse, orbitState;
+
+function initThree() {
+  const host = document.getElementById('canvas-host');
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(host.clientWidth, host.clientHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  host.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x050708);
+
+  camera = new THREE.PerspectiveCamera(45, host.clientWidth / host.clientHeight, 0.1, 5000);
+
+  const light1 = new THREE.DirectionalLight(0xffffff, 1.0);
+  light1.position.set(1, 1.5, 1);
+  scene.add(light1);
+  scene.add(new THREE.AmbientLight(0x404040, 1.2));
+
+  raycaster = new THREE.Raycaster();
+  mouse = new THREE.Vector2();
+
+  orbitState = { radius: 300, theta: Math.PI/4, phi: Math.PI/3.2, target: new THREE.Vector3(0,0,0), dragging:false, lastX:0, lastY:0 };
+  updateCamera();
+
+  renderer.domElement.addEventListener('mousedown', e => { orbitState.dragging = true; orbitState.lastX = e.clientX; orbitState.lastY = e.clientY; });
+  window.addEventListener('mouseup', () => orbitState.dragging = false);
+  window.addEventListener('mousemove', e => {
+    if (orbitState.dragging) {
+      const dx = e.clientX - orbitState.lastX;
+      const dy = e.clientY - orbitState.lastY;
+      orbitState.theta -= dx * 0.006;
+      orbitState.phi = Math.min(Math.max(orbitState.phi - dy * 0.006, 0.15), Math.PI/2 - 0.05);
+      orbitState.lastX = e.clientX; orbitState.lastY = e.clientY;
+      updateCamera();
+    }
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    pickElevation();
+  });
+  renderer.domElement.addEventListener('wheel', e => {
+    e.preventDefault();
+    orbitState.radius = Math.min(Math.max(orbitState.radius * (1 + e.deltaY * 0.001), 20), 1500);
+    updateCamera();
+  }, { passive:false });
+
+  window.addEventListener('resize', () => {
+    camera.aspect = host.clientWidth / host.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(host.clientWidth, host.clientHeight);
+  });
+
+  animate();
+}
+
+function updateCamera() {
+  const { radius, theta, phi, target } = orbitState;
+  camera.position.set(
+    target.x + radius * Math.sin(phi) * Math.cos(theta),
+    target.y + radius * Math.cos(phi),
+    target.z + radius * Math.sin(phi) * Math.sin(theta)
+  );
+  camera.lookAt(target);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+
+function pickElevation() {
+  if (!mesh3d) return;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObject(mesh3d);
+  if (hits.length) {
+    els.hudElev.textContent = hits[0].point.y.toFixed(2);
+  }
+}
+
+function buildScene(meshData) {
+  if (mesh3d) { scene.remove(mesh3d); mesh3d.geometry.dispose(); }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(meshData.uvs, 2));
+  geo.setIndex(meshData.indices);
+
+  // center + scale for a comfortable default camera framing
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  const center = new THREE.Vector3();
+  bb.getCenter(center);
+  geo.translate(-center.x, -center.y, -center.z);
+  const size = new THREE.Vector3();
+  bb.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z, 1);
+  const scaleFactor = 200 / maxDim;
+  geo.scale(scaleFactor, scaleFactor, scaleFactor);
+  geo.computeVertexNormals();
+
+  const material = new THREE.MeshStandardMaterial({ color: 0x8fa7b3, wireframe:false, side: THREE.DoubleSide, flatShading:false });
+  mesh3d = new THREE.Mesh(geo, material);
+  scene.add(mesh3d);
+
+  // color-by-height as default view
+  applyHeightColoring(geo);
+
+  orbitState.radius = 320;
+  orbitState.target.set(0,0,0);
+  updateCamera();
+
+  if (state.textureUrl) {
+    new THREE.TextureLoader().load(state.textureUrl, tex => {
+      mesh3d.material.map = tex;
+      mesh3d.material.vertexColors = false;
+      mesh3d.material.needsUpdate = true;
+    });
+  }
+}
+
+function applyHeightColoring(geo) {
+  const pos = geo.attributes.position;
+  const colors = [];
+  let minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < pos.count; i++) { const y = pos.getY(i); minY = Math.min(minY,y); maxY = Math.max(maxY,y); }
+  const range = Math.max(maxY - minY, 1e-6);
+  const low = new THREE.Color(0x1b3a4a), high = new THREE.Color(0xdfe6ea);
+  for (let i = 0; i < pos.count; i++) {
+    const t = (pos.getY(i) - minY) / range;
+    const c = low.clone().lerp(high, t);
+    colors.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  mesh3d.material.vertexColors = true;
+  mesh3d.material.map = null;
+  mesh3d.material.needsUpdate = true;
+}
+
+document.getElementById('view-modes').addEventListener('click', e => {
+  if (e.target.tagName !== 'BUTTON' || e.target.disabled) return;
+  document.querySelectorAll('.view-modes button').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  const mode = e.target.dataset.view;
+  if (!mesh3d) return;
+  mesh3d.material.wireframe = (mode === 'wireframe');
+  if (mode === 'height') applyHeightColoring(mesh3d.geometry);
+  if (mode === 'texture' && state.textureUrl) {
+    mesh3d.material.vertexColors = false;
+    new THREE.TextureLoader().load(state.textureUrl, tex => { mesh3d.material.map = tex; mesh3d.material.needsUpdate = true; });
+  }
+  if (mode === 'uncertainty') {
+    if (state.uncertaintyMap) {
+      applyRasterColoring(mesh3d.geometry, state.uncertaintyMap.values, state.uncertaintyMap.shape, 0x1b3a4a, 0xe8a860, 0, 1);
+    } else {
+      logLine('Uncertainty was not computed for this job.', 'err');
+    }
+  }
+  if (mode === 'slope') {
+    if (state.slopeMap) {
+      const flat = state.slopeMap.values.flat();
+      const maxSlope = Math.max(...flat.filter(v => v >= 0), 1);
+      applyRasterColoring(mesh3d.geometry, state.slopeMap.values, state.slopeMap.shape, 0x1b3a4a, 0xe86f5f, 0, maxSlope, v => v < 0);
+    } else {
+      logLine('Slope layer not available for this job.', 'err');
+    }
+  }
+  if (mode === 'error') {
+    if (state.errorMap) {
+      const flat = state.errorMap.values.flat();
+      const maxAbs = Math.max(...flat.map(Math.abs), 0.01);
+      applyDivergingColoring(mesh3d.geometry, state.errorMap.values, state.errorMap.shape, maxAbs);
+    } else {
+      logLine('Error map not available for this job (needs successful absolute calibration).', 'err');
+    }
+  }
+  updateLegend(mode);
+});
+
+// Generic per-vertex raster coloring: samples a HxW `values` grid at each
+// vertex's UV coordinate (nearest-neighbor, since the mesh is typically
+// downsampled relative to the full-resolution raster) and lerps between
+// `lowHex`/`highHex` across [vmin, vmax]. `isInvalid(v)` marks sentinel
+// nodata values (e.g. slope's -1 fill) so they render as a neutral gray
+// instead of a misleading color.
+function applyRasterColoring(geo, values, shape, lowHex, highHex, vmin, vmax, isInvalid) {
+  const H = shape[0], W = shape[1];
+  const pos = geo.attributes.position;
+  const uv = geo.attributes.uv;
+  const colors = [];
+  const low = new THREE.Color(lowHex), high = new THREE.Color(highHex), invalidC = new THREE.Color(0x2a2f33);
+  const range = Math.max(vmax - vmin, 1e-9);
+  for (let i = 0; i < pos.count; i++) {
+    const u = uv.getX(i), v = 1 - uv.getY(i);
+    const row = Math.min(H - 1, Math.max(0, Math.round(v * (H - 1))));
+    const col = Math.min(W - 1, Math.max(0, Math.round(u * (W - 1))));
+    const val = values[row][col];
+    if (isInvalid && isInvalid(val)) {
+      colors.push(invalidC.r, invalidC.g, invalidC.b);
+      continue;
+    }
+    const t = Math.min(1, Math.max(0, (val - vmin) / range));
+    const c = low.clone().lerp(high, t);
+    colors.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  mesh3d.material.vertexColors = true;
+  mesh3d.material.map = null;
+  mesh3d.material.needsUpdate = true;
+}
+
+// Diverging color scale for signed error (predicted − reference): blue for
+// under-prediction, white/neutral at zero, orange-red for over-prediction.
+// Symmetric around 0 so color intensity directly reflects error magnitude
+// in either direction, not just "how far from the minimum."
+function applyDivergingColoring(geo, values, shape, maxAbs) {
+  const H = shape[0], W = shape[1];
+  const pos = geo.attributes.position;
+  const uv = geo.attributes.uv;
+  const colors = [];
+  const neg = new THREE.Color(0x3d7ea6), mid = new THREE.Color(0xdfe6ea), pos_ = new THREE.Color(0xd9583f);
+  for (let i = 0; i < pos.count; i++) {
+    const u = uv.getX(i), v = 1 - uv.getY(i);
+    const row = Math.min(H - 1, Math.max(0, Math.round(v * (H - 1))));
+    const col = Math.min(W - 1, Math.max(0, Math.round(u * (W - 1))));
+    const val = values[row][col];
+    const t = Math.min(1, Math.max(-1, val / maxAbs));
+    const c = t < 0 ? neg.clone().lerp(mid, 1 + t) : mid.clone().lerp(pos_, t);
+    colors.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  mesh3d.material.vertexColors = true;
+  mesh3d.material.map = null;
+  mesh3d.material.needsUpdate = true;
+}
+
+// ---- legend / colorbar ----
+function updateLegend(mode, meshData) {
+  const grads = {
+    height: { css: 'linear-gradient(to right, #1b3a4a, #dfe6ea)', unit: 'relative height', approxIfNotMetric: false },
+    uncertainty: { css: 'linear-gradient(to right, #1b3a4a, #e8a860)', unit: 'σ (normalized 0–1)', approxIfNotMetric: false },
+    slope: { css: 'linear-gradient(to right, #1b3a4a, #e86f5f)', unit: 'degrees', approxIfNotMetric: true },
+    error: { css: 'linear-gradient(to right, #3d7ea6, #dfe6ea, #d9583f)', unit: 'meters (pred − ref)', approxIfNotMetric: false },
+    wireframe: null,
+    texture: null,
+  };
+  const g = grads[mode];
+  if (!g) { els.legend.style.display = 'none'; return; }
+  els.legend.style.display = 'flex';
+  els.legendBar.style.background = g.css;
+
+  if (mode === 'slope' && state.slopeMap) {
+    const flat = state.slopeMap.values.flat().filter(v => v >= 0);
+    const maxSlope = Math.max(...flat, 1);
+    els.legendMin.textContent = `0°`;
+    els.legendMid.textContent = `${(maxSlope/2).toFixed(1)}°`;
+    els.legendMax.textContent = `${maxSlope.toFixed(1)}°`;
+  } else if (mode === 'error' && state.errorMap) {
+    const flat = state.errorMap.values.flat();
+    const maxAbs = Math.max(...flat.map(Math.abs), 0.01);
+    els.legendMin.textContent = `-${maxAbs.toFixed(1)}m`;
+    els.legendMid.textContent = `0m`;
+    els.legendMax.textContent = `+${maxAbs.toFixed(1)}m`;
+  } else if (mode === 'uncertainty') {
+    els.legendMin.textContent = 'low'; els.legendMid.textContent = 'med'; els.legendMax.textContent = 'high';
+  } else if (mode === 'height') {
+    els.legendMin.textContent = 'low'; els.legendMid.textContent = 'mid'; els.legendMax.textContent = 'high';
+  }
+
+  els.legendCaption.textContent = 'approximate scale — no metric CRS on this input';
+  els.legendCaption.classList.toggle('show', !!(g.approxIfNotMetric && !state.pixelSizeIsMetric));
+}
+
+// ---- hardware badge ----
+async function checkHealth() {
+  try {
+    const res = await fetch(`${API}/health`);
+    if (res.ok) {
+      els.hwDot.classList.add('ready');
+      els.hwLabel.textContent = 'Backend online';
+    }
+  } catch (e) {
+    els.hwLabel.textContent = 'Backend unreachable';
+  }
+}
+
+initThree();
+checkHealth();
+</script>
+</body>
+</html>

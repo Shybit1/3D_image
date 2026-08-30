@@ -1,0 +1,112 @@
+{
+  "label": "SYNTHETIC DEMONSTRATION DATA -- not real satellite imagery or real elevation",
+  "size": 256,
+  "terrain_elevation_range_m": [
+    5.0,
+    25.0
+  ],
+  "buildings": [
+    {
+      "id": 0,
+      "x": 145,
+      "y": 194,
+      "w": 38,
+      "h": 30,
+      "ground_elevation_m": 21.14,
+      "height_m": 36.7,
+      "roof_elevation_m": 57.84
+    },
+    {
+      "id": 1,
+      "x": 21,
+      "y": 74,
+      "w": 35,
+      "h": 20,
+      "ground_elevation_m": 15.41,
+      "height_m": 40.32,
+      "roof_elevation_m": 55.73
+    },
+    {
+      "id": 2,
+      "x": 109,
+      "y": 191,
+      "w": 37,
+      "h": 15,
+      "ground_elevation_m": 15.29,
+      "height_m": 37.49,
+      "roof_elevation_m": 52.78
+    },
+    {
+      "id": 3,
+      "x": 188,
+      "y": 73,
+      "w": 17,
+      "h": 26,
+      "ground_elevation_m": 14.84,
+      "height_m": 18.3,
+      "roof_elevation_m": 33.14
+    },
+    {
+      "id": 4,
+      "x": 212,
+      "y": 105,
+      "w": 32,
+      "h": 21,
+      "ground_elevation_m": 17.7,
+      "height_m": 26.67,
+      "roof_elevation_m": 44.37
+    },
+    {
+      "id": 5,
+      "x": 115,
+      "y": 217,
+      "w": 29,
+      "h": 28,
+      "ground_elevation_m": 15.4,
+      "height_m": 37.33,
+      "roof_elevation_m": 52.73
+    },
+    {
+      "id": 6,
+      "x": 79,
+      "y": 213,
+      "w": 32,
+      "h": 30,
+      "ground_elevation_m": 11.32,
+      "height_m": 15.97,
+      "roof_elevation_m": 27.29
+    },
+    {
+      "id": 7,
+      "x": 181,
+      "y": 142,
+      "w": 36,
+      "h": 19,
+      "ground_elevation_m": 23.6,
+      "height_m": 9.63,
+      "roof_elevation_m": 33.22
+    },
+    {
+      "id": 8,
+      "x": 39,
+      "y": 123,
+      "w": 26,
+      "h": 15,
+      "ground_elevation_m": 8.3,
+      "height_m": 25.25,
+      "roof_elevation_m": 33.55
+    },
+    {
+      "id": 9,
+      "x": 175,
+      "y": 135,
+      "w": 35,
+      "h": 37,
+      "ground_elevation_m": 23.86,
+      "height_m": 27.02,
+      "roof_elevation_m": 50.88
+    }
+  ],
+  "crs": "EPSG:4326",
+  "note": "Ground truth DSM is exactly known by construction; used to validate the calibration and metrics pipeline math, not to measure real-world accuracy."
+}

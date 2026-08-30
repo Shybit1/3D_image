@@ -1,0 +1,1005 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:,">
+<title>AeroTwin AI · Drone Video → 3D Digital Twin</title>
+<style>
+  :root{
+    --bg: #0a0d10;
+    --panel: #10151a;
+    --panel-raised: #141a20;
+    --line: #232b32;
+    --text: #dfe6ea;
+    --text-dim: #7c8891;
+    --accent: #5ec8f2;
+    --accent-dim: #2f5b6e;
+    --green: #5fce7a;
+    --amber: #e8a860;
+    --red: #e2685f;
+    --gray: #4a545c;
+    --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    --sans: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); overflow:hidden; }
+  button { font-family:var(--sans); }
+  a { color:var(--accent); }
+
+  .app { display:grid; grid-template-rows: 52px 1fr 30px; height:100%; }
+
+  header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 16px; border-bottom:1px solid var(--line); background:var(--panel);
+  }
+  .brand { display:flex; align-items:baseline; gap:10px; }
+  .brand .mark { font-family:var(--mono); font-size:14px; letter-spacing:0.16em; color:var(--accent); font-weight:600; }
+  .brand .sub { font-size:11px; color:var(--text-dim); font-family:var(--mono); }
+  .brand .tagline { font-size:10px; color:var(--gray); font-family:var(--mono); display:none; }
+  @media (min-width: 1100px){ .brand .tagline{ display:inline; } }
+  .head-right { display:flex; align-items:center; gap:10px; }
+  .hw-badge { display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:11px; color:var(--text-dim); border:1px solid var(--line); padding:4px 10px; }
+  .hw-dot { width:6px; height:6px; border-radius:50%; background:var(--gray); }
+  .hw-dot.ready { background:var(--green); box-shadow:0 0 6px var(--green); }
+  .hw-dot.down { background:var(--red); box-shadow:0 0 6px var(--red); }
+  .legacy-link { font-size:11px; font-family:var(--mono); color:var(--text-dim); text-decoration:none; border:1px solid var(--line); padding:4px 10px; }
+  .legacy-link:hover { color:var(--accent); border-color:var(--accent-dim); }
+
+  .body { display:grid; grid-template-columns: 300px 1fr 320px; height:100%; overflow:hidden; }
+  @media (max-width: 1100px){ .body { grid-template-columns: 260px 1fr 0px; } .panel-right{ display:none; } }
+  @media (max-width: 820px){ .body { grid-template-columns: 1fr; grid-template-rows: auto 45vh auto; } .panel-left, .panel-right{ display:block; } }
+
+  .panel { background:var(--panel); overflow-y:auto; padding:14px; border-right:1px solid var(--line); }
+  .panel-right { border-right:none; border-left:1px solid var(--line); }
+  .panel::-webkit-scrollbar{ width:8px; }
+  .panel::-webkit-scrollbar-thumb{ background:var(--line); }
+
+  .section-title { font-family:var(--mono); font-size:11px; letter-spacing:0.1em; color:var(--text-dim); text-transform:uppercase; margin:18px 0 8px; }
+  .section-title:first-child { margin-top:0; }
+
+  .drop-zone {
+    border:1px dashed var(--line); border-radius:2px; padding:18px 12px; text-align:center;
+    cursor:pointer; transition:border-color .15s;
+  }
+  .drop-zone:hover, .drop-zone.drag { border-color:var(--accent); }
+  .drop-zone .icon { font-size:20px; color:var(--text-dim); margin-bottom:6px; }
+  .drop-zone .hint { font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-top:4px; }
+  input[type=file]{ display:none; }
+
+  .meta-table { width:100%; font-family:var(--mono); font-size:11px; border-collapse:collapse; margin-top:10px; }
+  .meta-table td { padding:3px 0; color:var(--text-dim); }
+  .meta-table td:last-child { color:var(--text); text-align:right; }
+
+  .btn {
+    width:100%; padding:10px; margin-top:12px; background:var(--accent-dim); color:var(--text);
+    border:1px solid var(--accent); font-family:var(--mono); font-size:12px; letter-spacing:0.06em;
+    cursor:pointer; text-transform:uppercase;
+  }
+  .btn:hover:not(:disabled) { background:var(--accent); color:#04141c; }
+  .btn:disabled { opacity:0.35; cursor:not-allowed; border-color:var(--line); background:transparent; }
+  .btn-sm { padding:6px 10px; font-size:11px; margin-top:0; width:auto; }
+  .btn-secondary { background:transparent; border-color:var(--line); color:var(--text-dim); }
+  .btn-secondary:hover:not(:disabled){ color:var(--text); border-color:var(--text-dim); background:transparent; }
+  .btn-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+
+  .stage-list { list-style:none; margin:0; padding:0; font-family:var(--mono); font-size:11.5px; }
+  .stage-list li { display:flex; align-items:center; gap:8px; padding:5px 0; color:var(--text-dim); }
+  .stage-list .dot { width:9px; height:9px; border-radius:50%; border:1.5px solid var(--gray); flex:none; }
+  .stage-list li.completed { color:var(--text); }
+  .stage-list li.completed .dot { background:var(--green); border-color:var(--green); }
+  .stage-list li.active { color:var(--accent); }
+  .stage-list li.active .dot { background:var(--accent); border-color:var(--accent); box-shadow:0 0 6px var(--accent); animation:pulse 1.2s infinite; }
+  .stage-list li.failed { color:var(--red); }
+  .stage-list li.failed .dot { background:var(--red); border-color:var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+
+  .banner { font-family:var(--mono); font-size:11px; padding:8px 10px; border:1px solid var(--line); margin-top:10px; line-height:1.5; }
+  .banner.warn { border-color:var(--amber); color:var(--amber); }
+  .banner.err { border-color:var(--red); color:var(--red); }
+  .banner.ok { border-color:var(--green); color:var(--green); }
+  .banner.info { border-color:var(--accent-dim); color:var(--accent); }
+
+  .center { position:relative; background:#050708; overflow:hidden; }
+  #viewer-canvas { width:100%; height:100%; display:block; }
+  .center-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:8px; color:var(--gray); font-family:var(--mono); font-size:12px; text-align:center; padding:20px; }
+  .center-empty .big { font-size:13px; color:var(--text-dim); letter-spacing:0.08em; }
+
+  .viewer-toolbar { position:absolute; top:10px; left:10px; display:flex; gap:6px; flex-wrap:wrap; max-width:calc(100% - 20px); z-index:5; }
+  .viewer-toolbar button {
+    background:rgba(16,21,26,0.85); border:1px solid var(--line); color:var(--text-dim);
+    font-family:var(--mono); font-size:10.5px; padding:6px 9px; cursor:pointer; letter-spacing:0.04em;
+  }
+  .viewer-toolbar button:hover { color:var(--text); border-color:var(--accent-dim); }
+  .viewer-toolbar button.active { color:var(--accent); border-color:var(--accent); background:rgba(94,200,242,0.1); }
+
+  .viewer-hud { position:absolute; bottom:10px; left:10px; font-family:var(--mono); font-size:10.5px; color:var(--text-dim);
+    background:rgba(16,21,26,0.75); padding:6px 10px; border:1px solid var(--line); z-index:5; }
+
+  .metric-grid { display:grid; grid-template-columns: 1fr auto; gap:4px 8px; font-family:var(--mono); font-size:11px; }
+  .metric-grid .k { color:var(--text-dim); }
+  .metric-grid .v { color:var(--text); text-align:right; }
+
+  .mode-pill { display:inline-block; font-family:var(--mono); font-size:10.5px; padding:3px 8px; border:1px solid var(--line); letter-spacing:0.05em; }
+  .mode-pill.full { border-color:var(--green); color:var(--green); }
+  .mode-pill.geometric, .mode-pill.ai_depth { border-color:var(--amber); color:var(--amber); }
+  .mode-pill.fallback { border-color:var(--red); color:var(--red); }
+
+  .conf-bar-track { background:var(--panel-raised); border:1px solid var(--line); height:16px; position:relative; margin-top:4px; }
+  .conf-bar-fill { height:100%; background:linear-gradient(90deg, var(--red), var(--amber), var(--green)); }
+  .conf-bar-label { font-family:var(--mono); font-size:10.5px; color:var(--text-dim); margin-top:3px; display:flex; justify-content:space-between; }
+
+  .obj-list { list-style:none; margin:8px 0 0; padding:0; max-height:180px; overflow-y:auto; font-family:var(--mono); font-size:11px; }
+  .obj-list li { padding:6px 8px; border:1px solid var(--line); margin-bottom:4px; cursor:pointer; display:flex; justify-content:space-between; }
+  .obj-list li:hover { border-color:var(--accent-dim); }
+  .obj-list li.selected { border-color:var(--accent); color:var(--accent); }
+  .obj-list .cls { color:var(--text-dim); }
+  .obj-list li:hover .cls, .obj-list li.selected .cls { color:inherit; }
+
+  .measure-box { font-family:var(--mono); font-size:10.5px; color:var(--text-dim); margin-top:6px; padding:8px; border:1px solid var(--line); line-height:1.6; }
+  .measure-box b { color:var(--text); }
+
+  textarea, input[type=text] {
+    width:100%; background:var(--panel-raised); border:1px solid var(--line); color:var(--text);
+    font-family:var(--sans); font-size:12px; padding:8px; resize:vertical;
+  }
+  textarea:focus, input[type=text]:focus { outline:none; border-color:var(--accent-dim); }
+
+  .spatial-answer { margin-top:10px; padding:10px; border:1px solid var(--line); font-size:12px; line-height:1.5; }
+  .spatial-answer .tag { display:inline-block; font-family:var(--mono); font-size:9.5px; padding:2px 6px; border:1px solid; margin-right:6px; letter-spacing:0.05em; }
+  .tag.grounded { border-color:var(--green); color:var(--green); }
+  .tag.ungrounded { border-color:var(--amber); color:var(--amber); }
+  .spatial-support { margin-top:8px; font-family:var(--mono); font-size:10px; color:var(--text-dim); white-space:pre-wrap; word-break:break-word; }
+
+  .cd-inputs { display:flex; gap:6px; margin-top:6px; }
+  .cd-inputs input { flex:1; }
+
+  footer {
+    display:flex; align-items:center; gap:18px; padding:0 16px; border-top:1px solid var(--line);
+    background:var(--panel); font-family:var(--mono); font-size:10.5px; color:var(--text-dim); overflow-x:auto; white-space:nowrap;
+  }
+  footer b { color:var(--text); font-weight:500; }
+
+  .field-note { font-size:10px; color:var(--gray); font-family:var(--mono); margin-top:4px; line-height:1.4; }
+  .empty-note { font-size:11px; color:var(--gray); font-family:var(--mono); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="brand">
+      <span class="mark">AEROTWIN AI</span>
+      <span class="sub">Drone Video &rarr; 3D Digital Twin</span>
+      <span class="tagline">Geometry &middot; AI Depth &middot; Semantics &middot; Uncertainty &middot; Spatial Intelligence</span>
+    </div>
+    <div class="head-right">
+      <a class="legacy-link" href="/legacy.html">Legacy / Satellite DSM Mode &rarr;</a>
+      <div class="hw-badge"><span class="hw-dot" id="healthDot"></span><span id="healthText">CHECKING…</span></div>
+    </div>
+  </header>
+
+  <div class="body">
+
+    <!-- LEFT PANEL -->
+    <div class="panel panel-left">
+      <div class="section-title">Video Input</div>
+      <div class="drop-zone" id="dropZone">
+        <div class="icon">&#9660;</div>
+        <div>Drop drone video or click to browse</div>
+        <div class="hint">MP4 / MOV / AVI</div>
+        <input type="file" id="fileInput" accept="video/*" />
+      </div>
+      <table class="meta-table" id="metaTable" style="display:none">
+        <tr><td>Filename</td><td id="mFilename">—</td></tr>
+        <tr><td>Size</td><td id="mSize">—</td></tr>
+        <tr><td>Video ID</td><td id="mVideoId">—</td></tr>
+        <tr><td>Status</td><td id="mStatus">—</td></tr>
+        <tr><td>Resolution</td><td id="mResolution">—</td></tr>
+        <tr><td>FPS</td><td id="mFps">—</td></tr>
+        <tr><td>Frames</td><td id="mFrames">—</td></tr>
+        <tr><td>Duration</td><td id="mDuration">—</td></tr>
+      </table>
+      <div id="uploadBanner"></div>
+      <button class="btn" id="startBtn" disabled>Start Reconstruction</button>
+
+      <div class="section-title">Pipeline</div>
+      <ul class="stage-list" id="stageList"></ul>
+      <div id="jobBanner"></div>
+    </div>
+
+    <!-- CENTER VIEWER -->
+    <div class="center" id="centerViewer">
+      <canvas id="viewer-canvas"></canvas>
+      <div class="center-empty" id="viewerEmpty">
+        <div class="big">3D DIGITAL TWIN</div>
+        <div>Upload a drone video and start reconstruction<br/>to populate the viewer with real pipeline output.</div>
+      </div>
+      <div class="viewer-toolbar" id="viewerToolbar" style="display:none">
+        <button id="btnReset">RESET CAM</button>
+        <button id="btnWireframe">WIREFRAME</button>
+        <button id="btnPoints">POINTS</button>
+        <button id="btnTrajectory">CAMERA TRAJECTORY</button>
+      </div>
+      <div class="viewer-hud" id="viewerHud" style="display:none"></div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="panel panel-right">
+      <div class="section-title">Scene Telemetry</div>
+      <div class="metric-grid" id="metricGrid"></div>
+      <div id="finalModeBox" style="margin-top:8px;"></div>
+
+      <div class="section-title">Confidence</div>
+      <div id="confidenceBox"><div class="empty-note">No confidence report yet.</div></div>
+
+      <div class="section-title">Semantic Classes</div>
+      <div id="semanticBox"><div class="empty-note">No semantic breakdown yet.</div></div>
+
+      <div class="section-title">Digital Twin Objects</div>
+      <div id="objectsBox"><div class="empty-note">No objects extracted yet.</div></div>
+      <div id="measureBox"></div>
+
+      <div class="section-title">Spatial AI</div>
+      <div class="field-note">Ask about the reconstructed environment. Answers are grounded in the job's own scene data, or clearly marked otherwise.</div>
+      <textarea id="spatialInput" rows="2" placeholder="e.g. How many buildings are present?"></textarea>
+      <button class="btn btn-sm" id="spatialBtn" style="width:100%;margin-top:6px;">Ask</button>
+      <div id="spatialAnswerBox"></div>
+
+      <div class="section-title">Change Detection</div>
+      <div class="field-note">Compare two completed reconstruction jobs.</div>
+      <div class="cd-inputs">
+        <input type="text" id="cdJobA" placeholder="Job ID A" />
+        <input type="text" id="cdJobB" placeholder="Job ID B" />
+      </div>
+      <button class="btn btn-sm" id="cdBtn" style="width:100%;margin-top:6px;">Run Comparison</button>
+      <div id="cdResultBox"></div>
+    </div>
+
+  </div>
+
+  <footer id="statusFooter">
+    <span>API <b id="fApi">—</b></span>
+    <span>JOB ID <b id="fJob">—</b></span>
+    <span>PROGRESS <b id="fProgress">—</b></span>
+    <span>FINAL MODE <b id="fMode">—</b></span>
+    <span>SYSTEM STATUS <b id="fSystem">IDLE</b></span>
+  </footer>
+
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from './vendor/three.module.js';
+import { GLTFLoader } from './vendor/loaders/GLTFLoader.js';
+import { OrbitControls } from './vendor/controls/OrbitControls.js';
+
+const API = '/api';
+
+// ---------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------
+const state = {
+  videoId: null,
+  jobId: null,
+  progressTimer: null,
+  healthTimer: null,
+  lastStatus: null,
+  objects: [],
+  selectedObjectId: null,
+  trajectoryVisible: false,
+};
+
+const PIPELINE_STAGES = [
+  'VIDEO_ANALYSIS', 'KEYFRAME_SELECTION', 'POSE_ESTIMATION', 'SPARSE_RECONSTRUCTION',
+  'AI_DEPTH', 'DEPTH_FUSION', 'UNCERTAINTY', 'DENSE_RECONSTRUCTION',
+  'SEMANTIC_ANALYSIS', 'DIGITAL_TWIN', 'FINALIZATION',
+];
+const STAGE_LABELS = {
+  VIDEO_ANALYSIS: 'Video Analysis', KEYFRAME_SELECTION: 'Keyframe Selection',
+  POSE_ESTIMATION: 'Camera Pose Estimation', SPARSE_RECONSTRUCTION: 'Sparse Reconstruction',
+  AI_DEPTH: 'AI Depth', DEPTH_FUSION: 'Depth Fusion', UNCERTAINTY: 'Uncertainty Estimation',
+  DENSE_RECONSTRUCTION: 'Dense Reconstruction', SEMANTIC_ANALYSIS: 'Semantic Analysis',
+  DIGITAL_TWIN: 'Digital Twin', FINALIZATION: 'Finalization',
+};
+
+// ---------------------------------------------------------------------
+// DOM refs
+// ---------------------------------------------------------------------
+const el = (id) => document.getElementById(id);
+const dropZone = el('dropZone'), fileInput = el('fileInput');
+const metaTable = el('metaTable'), uploadBanner = el('uploadBanner');
+const startBtn = el('startBtn'), stageList = el('stageList'), jobBanner = el('jobBanner');
+const metricGrid = el('metricGrid'), finalModeBox = el('finalModeBox');
+const confidenceBox = el('confidenceBox'), semanticBox = el('semanticBox');
+const objectsBox = el('objectsBox'), measureBox = el('measureBox');
+const spatialInput = el('spatialInput'), spatialBtn = el('spatialBtn'), spatialAnswerBox = el('spatialAnswerBox');
+const cdJobA = el('cdJobA'), cdJobB = el('cdJobB'), cdBtn = el('cdBtn'), cdResultBox = el('cdResultBox');
+const viewerEmpty = el('viewerEmpty'), viewerToolbar = el('viewerToolbar'), viewerHud = el('viewerHud');
+
+// ---------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------
+function fmtBytes(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1024 ** 2) return (n / 1024).toFixed(1) + ' KB';
+  if (n < 1024 ** 3) return (n / 1024 ** 2).toFixed(1) + ' MB';
+  return (n / 1024 ** 3).toFixed(2) + ' GB';
+}
+function fmtDash(v, digits) {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'number') return digits !== undefined ? v.toFixed(digits) : String(v);
+  return String(v);
+}
+function bannerHtml(kind, text) {
+  return `<div class="banner ${kind}">${text}</div>`;
+}
+async function apiJson(path, opts) {
+  const res = await fetch(API + path, opts);
+  let body = null;
+  try { body = await res.json(); } catch (e) { /* no body */ }
+  if (!res.ok) {
+    const detail = (body && body.detail) ? body.detail : res.statusText;
+    const err = new Error(detail);
+    err.status = res.status;
+    throw err;
+  }
+  return body;
+}
+
+// ---------------------------------------------------------------------
+// Backend health
+// ---------------------------------------------------------------------
+async function checkHealth() {
+  const dot = el('healthDot'), text = el('healthText'), fApi = el('fApi');
+  try {
+    const res = await fetch(API + '/health');
+    if (!res.ok) throw new Error('bad status');
+    dot.className = 'hw-dot ready';
+    text.textContent = 'BACKEND ONLINE';
+    fApi.textContent = 'ONLINE';
+  } catch (e) {
+    dot.className = 'hw-dot down';
+    text.textContent = 'BACKEND OFFLINE';
+    fApi.textContent = 'OFFLINE';
+  }
+}
+checkHealth();
+state.healthTimer = setInterval(checkHealth, 6000);
+
+// ---------------------------------------------------------------------
+// Video upload
+// ---------------------------------------------------------------------
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault(); dropZone.classList.remove('drag');
+  if (e.dataTransfer.files.length) handleUpload(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length) handleUpload(fileInput.files[0]);
+});
+
+async function handleUpload(file) {
+  uploadBanner.innerHTML = bannerHtml('info', 'Uploading &amp; probing video…');
+  startBtn.disabled = true;
+  metaTable.style.display = 'none';
+
+  const form = new FormData();
+  form.append('file', file);
+
+  try {
+    const data = await apiJson('/video/upload', { method: 'POST', body: form });
+    state.videoId = data.video_id;
+    el('mFilename').textContent = data.filename;
+    el('mSize').textContent = fmtBytes(file.size);
+    el('mVideoId').textContent = data.video_id;
+    el('mStatus').textContent = data.status;
+    el('mResolution').textContent = `${data.width} × ${data.height}`;
+    el('mFps').textContent = data.fps.toFixed(2);
+    el('mFrames').textContent = data.frame_count;
+    el('mDuration').textContent = data.duration_seconds.toFixed(1) + ' s';
+    metaTable.style.display = '';
+    uploadBanner.innerHTML = bannerHtml('ok', 'Video accepted. Ready to reconstruct.');
+    startBtn.disabled = false;
+  } catch (e) {
+    uploadBanner.innerHTML = bannerHtml('err', 'Upload failed: ' + e.message);
+    startBtn.disabled = true;
+    state.videoId = null;
+  }
+}
+
+// ---------------------------------------------------------------------
+// Pipeline stage list rendering
+// ---------------------------------------------------------------------
+function renderStages(status) {
+  stageList.innerHTML = '';
+  const completed = new Set((status && status.stages_completed) || []);
+  const current = status ? status.current_stage : null;
+  const failed = status && status.status === 'failed';
+
+  PIPELINE_STAGES.forEach((stage) => {
+    const li = document.createElement('li');
+    let cls = '';
+    if (failed && stage === current) cls = 'failed';
+    else if (completed.has(stage)) cls = 'completed';
+    else if (stage === current) cls = 'active';
+    li.className = cls;
+    li.innerHTML = `<span class="dot"></span><span>${STAGE_LABELS[stage]}</span>`;
+    stageList.appendChild(li);
+  });
+}
+renderStages(null);
+
+// ---------------------------------------------------------------------
+// Start reconstruction + progress polling
+// ---------------------------------------------------------------------
+startBtn.addEventListener('click', async () => {
+  if (!state.videoId) return;
+  startBtn.disabled = true;
+  jobBanner.innerHTML = bannerHtml('info', 'Queuing reconstruction job…');
+  try {
+    const data = await apiJson('/reconstruction/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ video_id: state.videoId }),
+    });
+    state.jobId = data.job_id;
+    el('fJob').textContent = data.job_id;
+    jobBanner.innerHTML = bannerHtml('info', `Job <b>${data.job_id}</b> ${data.status}.`);
+    resetSceneForNewJob();
+    startPolling();
+  } catch (e) {
+    jobBanner.innerHTML = bannerHtml('err', 'Failed to start reconstruction: ' + e.message);
+    startBtn.disabled = false;
+  }
+});
+
+function startPolling() {
+  if (state.progressTimer) clearInterval(state.progressTimer);
+  pollOnce();
+  state.progressTimer = setInterval(pollOnce, 2000);
+}
+
+async function pollOnce() {
+  if (!state.jobId) return;
+  try {
+    const status = await apiJson(`/reconstruction/${state.jobId}/progress`);
+    state.lastStatus = status;
+    renderStages(status);
+    renderMetrics(status);
+    updateFooter(status);
+
+    const terminal = ['completed', 'completed_with_fallback', 'failed'].includes(status.status);
+    if (terminal) {
+      clearInterval(state.progressTimer);
+      state.progressTimer = null;
+      startBtn.disabled = false;
+      onJobTerminal(status);
+    }
+  } catch (e) {
+    jobBanner.innerHTML = bannerHtml('err', 'Progress poll failed: ' + e.message);
+  }
+}
+
+function updateFooter(status) {
+  el('fProgress').textContent = status.progress_pct.toFixed(1) + '%';
+  el('fMode').textContent = status.final_mode || '—';
+  el('fSystem').textContent = status.status.toUpperCase();
+}
+
+function renderMetrics(status) {
+  const m = status.metrics || {};
+  const rows = [
+    ['Reconstruction status', m.reconstruction_status],
+    ['Keyframes selected', m.keyframes_selected],
+    ['Registered images', (m.registered_images != null && m.total_images != null) ? `${m.registered_images} / ${m.total_images}` : null],
+    ['SfM status', m.sfm_status],
+    ['Reconstruction quality', m.reconstruction_quality],
+    ['Depth frames', m.depth_frames],
+    ['Frames fused', m.frames_fused],
+    ['Mean confidence', typeof m.mean_confidence === 'number' ? m.mean_confidence.toFixed(3) : null],
+    ['High-confidence fraction', typeof m.overall_high_confidence_fraction === 'number' ? (m.overall_high_confidence_fraction * 100).toFixed(1) + '%' : null],
+    ['Point count', m.point_count],
+    ['Mesh vertices', m.mesh_vertex_count],
+    ['Semantic object count', m.object_count],
+  ];
+  metricGrid.innerHTML = rows.map(([k, v]) => `<div class="k">${k}</div><div class="v">${fmtDash(v)}</div>`).join('');
+
+  if (status.final_mode) {
+    const labelMap = {
+      FULL_RECONSTRUCTION: 'Full reconstruction', GEOMETRIC_MODE: 'Geometric reconstruction',
+      AI_DEPTH_MODE: 'AI Depth reconstruction', FALLBACK_MODE: 'Fallback reconstruction',
+    };
+    const pillClass = { FULL_RECONSTRUCTION: 'full', GEOMETRIC_MODE: 'geometric', AI_DEPTH_MODE: 'ai_depth', FALLBACK_MODE: 'fallback' }[status.final_mode] || '';
+    finalModeBox.innerHTML = `<span class="mode-pill ${pillClass}">${labelMap[status.final_mode] || status.final_mode}</span>`;
+  } else {
+    finalModeBox.innerHTML = '';
+  }
+}
+
+function onJobTerminal(status) {
+  if (status.status === 'failed') {
+    jobBanner.innerHTML = bannerHtml('err', `Job failed.<br/>${status.error || 'No error detail returned.'}`);
+    return;
+  }
+  if (status.status === 'completed_with_fallback') {
+    jobBanner.innerHTML = bannerHtml('warn', `Completed with fallback (${status.final_mode}).<br/>${status.error || ''}`);
+  } else {
+    jobBanner.innerHTML = bannerHtml('ok', 'Reconstruction completed.');
+  }
+  loadResultAssets(status);
+}
+
+function resetSceneForNewJob() {
+  clearViewer();
+  confidenceBox.innerHTML = '<div class="empty-note">Pipeline running…</div>';
+  semanticBox.innerHTML = '<div class="empty-note">Pipeline running…</div>';
+  objectsBox.innerHTML = '<div class="empty-note">Pipeline running…</div>';
+  measureBox.innerHTML = '';
+  state.objects = [];
+  state.selectedObjectId = null;
+}
+
+// ---------------------------------------------------------------------
+// After job completion: load whatever real assets exist
+// ---------------------------------------------------------------------
+async function loadResultAssets(status) {
+  await tryLoadMesh();
+  await tryLoadConfidence();
+  await tryLoadSemantic(status);
+  await tryLoadObjects();
+}
+
+async function tryLoadMesh() {
+  const jobId = state.jobId;
+  // Prefer the real GLB (Module 46); fall back to the raw JSON mesh if
+  // the GLB isn't present for some reason but a JSON mesh is.
+  const glbUrl = `${API}/reconstruction/${jobId}/asset/model.glb`;
+  try {
+    const head = await fetch(glbUrl, { method: 'GET' });
+    if (head.ok) {
+      const blob = await head.blob();
+      loadGlbFromBlob(blob);
+      return;
+    }
+  } catch (e) { /* fall through */ }
+
+  try {
+    const meshJson = await apiJson(`/reconstruction/${jobId}/asset/mesh.json`);
+    loadMeshFromJson(meshJson);
+  } catch (e) {
+    showViewerEmpty('No 3D mesh output is available for this job.<br/>' + (e.message || ''));
+  }
+}
+
+// ---------------------------------------------------------------------
+// Confidence / Semantics / Objects
+// ---------------------------------------------------------------------
+async function tryLoadConfidence() {
+  try {
+    const report = await apiJson(`/reconstruction/${state.jobId}/confidence`);
+    const pct = typeof report.overall_mean_confidence === 'number' ? report.overall_mean_confidence * 100 : null;
+    confidenceBox.innerHTML = `
+      <div class="conf-bar-track"><div class="conf-bar-fill" style="width:${pct !== null ? pct.toFixed(1) : 0}%"></div></div>
+      <div class="conf-bar-label"><span>Mean confidence</span><span>${pct !== null ? pct.toFixed(1) + '%' : '—'}</span></div>
+      <div class="metric-grid" style="margin-top:8px;">
+        <div class="k">High confidence</div><div class="v">${fmtPct(report.overall_high_fraction)}</div>
+        <div class="k">Medium confidence</div><div class="v">${fmtPct(report.overall_medium_fraction)}</div>
+        <div class="k">Low confidence</div><div class="v">${fmtPct(report.overall_low_fraction)}</div>
+        <div class="k">No coverage</div><div class="v">${fmtPct(report.overall_no_coverage_fraction)}</div>
+      </div>
+      <div class="field-note">Summary reliability report only — a full per-point confidence map is not exposed by this build.</div>`;
+  } catch (e) {
+    confidenceBox.innerHTML = '<div class="empty-note">Confidence report unavailable for this job.</div>';
+  }
+}
+function fmtPct(v) { return typeof v === 'number' ? (v * 100).toFixed(1) + '%' : '—'; }
+
+async function tryLoadSemantic(status) {
+  const fractions = status && status.metrics ? status.metrics.semantic_class_fractions : null;
+  if (!fractions) {
+    semanticBox.innerHTML = '<div class="empty-note">No semantic breakdown available for this job.</div>';
+    return;
+  }
+  const rows = Object.entries(fractions).map(([cls, frac]) =>
+    `<div class="k">${cls}</div><div class="v">${(frac * 100).toFixed(1)}%</div>`).join('');
+  semanticBox.innerHTML = `<div class="metric-grid">${rows}</div>`;
+}
+
+async function tryLoadObjects() {
+  try {
+    const data = await apiJson(`/reconstruction/${state.jobId}/objects`);
+    state.objects = data.objects || [];
+    if (!state.objects.length) {
+      objectsBox.innerHTML = '<div class="empty-note">No discrete objects were extracted for this job.</div>';
+      return;
+    }
+    objectsBox.innerHTML = `
+      <div class="field-note">${data.scale_disclaimer || ''}</div>
+      <ul class="obj-list" id="objList"></ul>`;
+    const listEl = el('objList');
+    state.objects.forEach((obj) => {
+      const li = document.createElement('li');
+      li.dataset.id = obj.object_id;
+      li.innerHTML = `<span class="cls">${obj.semantic_class}</span><span>${obj.mean_confidence.toFixed(2)}</span>`;
+      li.addEventListener('click', () => selectObject(obj.object_id));
+      listEl.appendChild(li);
+    });
+  } catch (e) {
+    objectsBox.innerHTML = '<div class="empty-note">No digital twin objects available for this job.</div>';
+  }
+}
+
+async function selectObject(objectId) {
+  state.selectedObjectId = objectId;
+  document.querySelectorAll('#objList li').forEach((li) => {
+    li.classList.toggle('selected', li.dataset.id === objectId);
+  });
+  const obj = state.objects.find((o) => o.object_id === objectId);
+  if (!obj) return;
+  highlightObjectInViewer(obj);
+
+  measureBox.innerHTML = '<div class="empty-note">Measuring…</div>';
+  try {
+    const m = await apiJson(`/reconstruction/${state.jobId}/measure`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ object_id: objectId }),
+    });
+    measureBox.innerHTML = `
+      <div class="measure-box">
+        <div><b>Height</b>: ${fmtDash(m.height.value, 2)} (${m.height.scale_mode})</div>
+        <div><b>Area</b>: ${fmtDash(m.area.value, 2)} (${m.area.scale_mode})</div>
+        <div><b>Volume est.</b>: ${fmtDash(m.volume_estimate.value, 2)} (${m.volume_estimate.scale_mode})</div>
+        <div><b>Method</b>: ${m.height.method}</div>
+      </div>`;
+  } catch (e) {
+    measureBox.innerHTML = bannerHtml('err', 'Measurement failed: ' + e.message);
+  }
+}
+
+// ---------------------------------------------------------------------
+// Spatial AI
+// ---------------------------------------------------------------------
+spatialBtn.addEventListener('click', async () => {
+  const query = spatialInput.value.trim();
+  if (!query) return;
+  if (!state.jobId) { spatialAnswerBox.innerHTML = bannerHtml('warn', 'Start a reconstruction job first.'); return; }
+  spatialAnswerBox.innerHTML = bannerHtml('info', 'Querying scene data…');
+  try {
+    const data = await apiJson('/spatial/query', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id: state.jobId, query }),
+    });
+    const tagClass = data.grounded ? 'grounded' : 'ungrounded';
+    const tagText = data.grounded ? 'GROUNDED' : 'UNGROUNDED';
+    let support = '';
+    if (data.supporting_data) {
+      support = `<div class="spatial-support">${escapeHtml(JSON.stringify(data.supporting_data, null, 2))}</div>`;
+    }
+    spatialAnswerBox.innerHTML = `
+      <div class="spatial-answer">
+        <span class="tag ${tagClass}">${tagText}</span><span class="tag" style="border-color:var(--line);color:var(--text-dim)">${data.intent || 'query'}</span>
+        <div style="margin-top:6px;">${escapeHtml(data.answer || '')}</div>
+        ${support}
+      </div>`;
+  } catch (e) {
+    spatialAnswerBox.innerHTML = bannerHtml('err', 'Query failed: ' + e.message);
+  }
+});
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+// ---------------------------------------------------------------------
+// Change detection
+// ---------------------------------------------------------------------
+cdBtn.addEventListener('click', async () => {
+  const a = cdJobA.value.trim(), b = cdJobB.value.trim();
+  if (!a || !b) { cdResultBox.innerHTML = bannerHtml('warn', 'Enter both job IDs.'); return; }
+  cdResultBox.innerHTML = bannerHtml('info', 'Running change detection…');
+  try {
+    const data = await apiJson('/change-detection/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id_a: a, job_id_b: b }),
+    });
+    renderChangeResult(data);
+  } catch (e) {
+    cdResultBox.innerHTML = bannerHtml('err', 'Change detection failed: ' + e.message);
+  }
+});
+
+function renderChangeResult(data) {
+  const rows = [
+    ['Registration trusted', data.registration_trusted],
+    ['Registration RMSE', typeof data.registration_rmse === 'number' ? data.registration_rmse.toFixed(4) : null],
+  ];
+  let classRows = '';
+  if (data.class_fractions) {
+    classRows = Object.entries(data.class_fractions).map(([k, v]) =>
+      `<div class="k">${k}</div><div class="v">${(v * 100).toFixed(1)}%</div>`).join('');
+  }
+  const reasons = (data.reasons && data.reasons.length) ? `<div class="field-note">${data.reasons.join('; ')}</div>` : '';
+  cdResultBox.innerHTML = `
+    <div class="metric-grid" style="margin-top:8px;">
+      ${rows.map(([k, v]) => `<div class="k">${k}</div><div class="v">${fmtDash(v)}</div>`).join('')}
+      ${classRows}
+    </div>
+    ${reasons}
+    <div class="field-note">Change ID: ${data.change_id}</div>`;
+}
+
+// =======================================================================
+// Three.js viewer
+// =======================================================================
+let renderer, scene, camera, controls;
+let currentMeshGroup = null;
+let currentPointsObj = null;
+let trajectoryGroup = null;
+let objectHighlight = null;
+let wireframeOn = false, pointsOn = false;
+
+function initViewer() {
+  const canvas = el('viewer-canvas');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xe8eef2);
+
+  camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20000);
+  camera.position.set(3, 3, 3);
+
+  const hemi = new THREE.HemisphereLight(0xffffff,0xd8e0e5, 1.3);
+  scene.add(hemi);
+  const dir = new THREE.DirectionalLight(0xffffff, 1.1);
+  dir.position.set(5, 8, 4);
+  scene.add(dir);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+
+  resizeViewer();
+  window.addEventListener('resize', resizeViewer);
+  animate();
+}
+
+function resizeViewer() {
+  const container = el('centerViewer');
+  const w = container.clientWidth, h = container.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function clearViewer() {
+  if (currentMeshGroup) { disposeObject(currentMeshGroup); scene.remove(currentMeshGroup); currentMeshGroup = null; }
+  if (currentPointsObj) { disposeObject(currentPointsObj); scene.remove(currentPointsObj); currentPointsObj = null; }
+  if (trajectoryGroup) { disposeObject(trajectoryGroup); scene.remove(trajectoryGroup); trajectoryGroup = null; }
+  if (objectHighlight) { disposeObject(objectHighlight); scene.remove(objectHighlight); objectHighlight = null; }
+  viewerToolbar.style.display = 'none';
+  viewerHud.style.display = 'none';
+  showViewerEmpty('Reconstructing… the 3D viewer will populate once dense reconstruction completes.');
+}
+
+function disposeObject(obj) {
+  obj.traverse((child) => {
+    if (child.geometry) child.geometry.dispose();
+    if (child.material) {
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      mats.forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); });
+    }
+  });
+}
+
+function showViewerEmpty(html) {
+  viewerEmpty.style.display = 'flex';
+  viewerEmpty.innerHTML = `<div class="big">3D DIGITAL TWIN</div><div>${html}</div>`;
+}
+function hideViewerEmpty() {
+  viewerEmpty.style.display = 'none';
+}
+
+function frameObject(obj3d) {
+  const box = new THREE.Box3().setFromObject(obj3d);
+  if (box.isEmpty()) return;
+  const size = new THREE.Vector3(); box.getSize(size);
+  const center = new THREE.Vector3(); box.getCenter(center);
+  const maxDim = Math.max(size.x, size.y, size.z, 0.001);
+  const dist = maxDim * 1.8;
+  camera.position.set(center.x + dist, center.y + dist * 0.8, center.z + dist);
+  controls.target.copy(center);
+  camera.near = maxDim / 1000;
+  camera.far = maxDim * 1000;
+  camera.updateProjectionMatrix();
+  controls.update();
+}
+
+// Backend mesh data is written as (x, y, elevation) — elevation lives in
+// the Z component, not Y. This rotation is display-only (it does not
+// touch the underlying vertex data or any numbers shown in the UI); it
+// simply presents the terrain with elevation pointing "up" the way a
+// geospatial viewer normally orients it.
+const DISPLAY_ROTATION_X = -Math.PI / 2;
+
+function loadGlbFromBlob(blob) {
+  const url = URL.createObjectURL(blob);
+  const loader = new GLTFLoader();
+  loader.load(url, (gltf) => {
+    URL.revokeObjectURL(url);
+    if (currentMeshGroup) { disposeObject(currentMeshGroup); scene.remove(currentMeshGroup); }
+    const group = new THREE.Group();
+    group.add(gltf.scene);
+    group.rotation.x = DISPLAY_ROTATION_X;
+    scene.add(group);
+    currentMeshGroup = group;
+    finalizeMeshLoad(group);
+  }, undefined, (err) => {
+    showViewerEmpty('Failed to load 3D model: ' + (err && err.message ? err.message : err));
+  });
+}
+
+function loadMeshFromJson(meshData) {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(meshData.uvs, 2));
+  geo.setIndex(meshData.indices);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x6e97a8, flatShading: false, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(geo, mat);
+  const group = new THREE.Group();
+  group.add(mesh);
+  group.rotation.x = DISPLAY_ROTATION_X;
+  if (currentMeshGroup) { disposeObject(currentMeshGroup); scene.remove(currentMeshGroup); }
+  scene.add(group);
+  currentMeshGroup = group;
+  finalizeMeshLoad(group);
+}
+
+function finalizeMeshLoad(group) {
+  hideViewerEmpty();
+  viewerToolbar.style.display = 'flex';
+  frameObject(group);
+  buildPointsRepresentation(group);
+  setWireframe(false);
+  setPointsMode(false);
+}
+
+function buildPointsRepresentation(group) {
+  // Build a point-cloud representation directly from the loaded mesh's
+  // own vertex positions/colors (real geometry already in the scene) so
+  // the "POINTS" toggle shows the same real reconstruction, not a
+  // fabricated placeholder.
+  const positions = [];
+  const colors = [];
+  group.traverse((child) => {
+    if (child.isMesh) {
+      const posAttr = child.geometry.attributes.position;
+      const colorAttr = child.geometry.attributes.color;
+      for (let i = 0; i < posAttr.count; i++) {
+        positions.push(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+        if (colorAttr) colors.push(colorAttr.getX(i), colorAttr.getY(i), colorAttr.getZ(i));
+        else colors.push(0.42, 0.6, 0.68);
+      }
+    }
+  });
+  if (!positions.length) return;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const mat = new THREE.PointsMaterial({ size: 0.01, vertexColors: true, sizeAttenuation: true });
+  const points = new THREE.Points(geo, mat);
+  points.rotation.x = DISPLAY_ROTATION_X;
+  points.visible = false;
+  if (currentPointsObj) { disposeObject(currentPointsObj); scene.remove(currentPointsObj); }
+  scene.add(points);
+  currentPointsObj = points;
+}
+
+function setWireframe(on) {
+  wireframeOn = on;
+  el('btnWireframe').classList.toggle('active', on);
+  if (currentMeshGroup) {
+    currentMeshGroup.traverse((child) => {
+      if (child.isMesh) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        mats.forEach((m) => { m.wireframe = on; });
+      }
+    });
+  }
+}
+
+function setPointsMode(on) {
+  pointsOn = on;
+  el('btnPoints').classList.toggle('active', on);
+  if (currentMeshGroup) currentMeshGroup.visible = !on;
+  if (currentPointsObj) currentPointsObj.visible = on;
+}
+
+el('btnReset').addEventListener('click', () => { if (currentMeshGroup) frameObject(currentMeshGroup); });
+el('btnWireframe').addEventListener('click', () => setWireframe(!wireframeOn));
+el('btnPoints').addEventListener('click', () => setPointsMode(!pointsOn));
+el('btnTrajectory').addEventListener('click', () => toggleTrajectory());
+
+async function toggleTrajectory() {
+  const btn = el('btnTrajectory');
+  if (trajectoryGroup) {
+    trajectoryGroup.visible = !trajectoryGroup.visible;
+    btn.classList.toggle('active', trajectoryGroup.visible);
+    updateHudTrajectory(trajectoryGroup.visible);
+    return;
+  }
+  try {
+    const data = await apiJson(`/reconstruction/${state.jobId}/camera-trajectory`);
+    const poses = data.poses || [];
+    if (!poses.length) { viewerHud.style.display = 'flex'; viewerHud.textContent = 'Trajectory unavailable'; return; }
+    const group = new THREE.Group();
+    const pts = poses.map((p) => new THREE.Vector3(p.tx, p.ty, p.tz));
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+    const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0x5ec8f2 }));
+    group.add(line);
+    const box = new THREE.Box3().setFromPoints(pts);
+    const size = new THREE.Vector3(); box.getSize(size);
+    const markerScale = Math.max(size.x, size.y, size.z, 1) * 0.01;
+    const markerGeo = new THREE.SphereGeometry(1, 6, 6);
+    pts.forEach((p) => {
+      const marker = new THREE.Mesh(markerGeo, new THREE.MeshBasicMaterial({ color: 0xe8a860 }));
+      marker.position.copy(p);
+      marker.scale.setScalar(markerScale);
+      group.add(marker);
+    });
+    group.rotation.x = DISPLAY_ROTATION_X;
+    scene.add(group);
+    trajectoryGroup = group;
+    btn.classList.add('active');
+    updateHudTrajectory(true, data.registered_images, data.total_images);
+  } catch (e) {
+    viewerHud.style.display = 'flex';
+    viewerHud.textContent = 'Trajectory unavailable';
+  }
+}
+function updateHudTrajectory(visible, registered, total) {
+  if (!visible) { viewerHud.style.display = 'none'; return; }
+  viewerHud.style.display = 'flex';
+  viewerHud.textContent = (registered != null && total != null)
+    ? `Cameras registered: ${registered} / ${total}`
+    : 'Camera trajectory';
+}
+
+function highlightObjectInViewer(obj) {
+  if (objectHighlight) { disposeObject(objectHighlight); scene.remove(objectHighlight); objectHighlight = null; }
+  if (!currentMeshGroup || !obj.bbox_xy) return;
+  const [minX, minY, maxX, maxY] = obj.bbox_xy;
+  const w = Math.max(maxX - minX, 0.001);
+  const d = Math.max(maxY - minY, 0.001);
+  const h = Math.max(obj.height_estimated || 0.001, 0.001);
+  const geo = new THREE.BoxGeometry(w, d, h);
+  const edges = new THREE.EdgesGeometry(geo);
+  const box = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x5ec8f2 }));
+  box.position.set((minX + maxX) / 2, (minY + maxY) / 2, h / 2);
+  const group = new THREE.Group();
+  group.add(box);
+  group.rotation.x = DISPLAY_ROTATION_X;
+  scene.add(group);
+  objectHighlight = group;
+}
+
+initViewer();
+</script>
+</body>
+</html>
