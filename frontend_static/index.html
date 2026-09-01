@@ -218,6 +218,7 @@
       </div>
       <div class="viewer-toolbar" id="viewerToolbar" style="display:none">
         <button id="btnReset">RESET CAM</button>
+        <button id="btnNatural">NATURAL 3D</button>
         <button id="btnWireframe">WIREFRAME</button>
         <button id="btnPoints">POINTS</button>
         <button id="btnTrajectory">CAMERA TRAJECTORY</button>
@@ -794,6 +795,11 @@ function clearViewer() {
   if (objectHighlight) { disposeObject(objectHighlight); scene.remove(objectHighlight); objectHighlight = null; }
   viewerToolbar.style.display = 'none';
   viewerHud.style.display = 'none';
+  // Reset NATURAL 3D state and texture cache (the texture is job-scoped).
+  rgbTexture = null;
+  naturalTexturedMats.length = 0;
+  natural3dOn = false;
+  el('btnNatural').classList.remove('active');
   showViewerEmpty('Reconstructing… the 3D viewer will populate once dense reconstruction completes.');
 }
 
@@ -931,7 +937,128 @@ function setPointsMode(on) {
   if (currentPointsObj) currentPointsObj.visible = on;
 }
 
+// ---------------------------------------------------------------------
+// NATURAL 3D — real RGB texture view (additive; reuses the existing mesh)
+// ---------------------------------------------------------------------
+// Loads the heightfield_rgb.png the pipeline already produced (served by the
+// existing secure asset endpoint — no new file-serving code) and applies it
+// to the SAME reconstructed geometry via its existing UVs. The texture is
+// loaded ONCE and cached, so toggling never downloads it again and never
+// creates a second mesh — we only ever change the material(s) on the meshes
+// already inside currentMeshGroup.
+//
+// Texture orientation is centralized here so a future correction is a
+// one-line change: flip via NATURAL_TEXTURE_FLIP_Y (applied to tex.flipY).
+const NATURAL_TEXTURE_FLIP_Y = false;
+const NATURAL_HUD_TEXT = 'NATURAL RGB VIEW · RECONSTRUCTED FROM VIDEO KEYFRAMES';
+
+let rgbTexture = null;          // cached natural RGB texture (loaded once)
+let natural3dOn = false;        // is NATURAL 3D currently active
+const naturalTexturedMats = []; // materials we textured (cleared on toggle-off)
+
+function naturalTextureUrl() {
+  return `${API}/reconstruction/${state.jobId}/asset/heightfield_rgb.png`;
+}
+
+// Load (and cache) the real RGB heightfield texture. Resolves with the
+// texture, or null when it cannot be loaded — callers must degrade gracefully.
+function loadNaturalTexture() {
+  return new Promise((resolve) => {
+    if (rgbTexture) { resolve(rgbTexture); return; }
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      naturalTextureUrl(),
+      (tex) => {
+        // NOTE: the vendored Three.js is r150, which uses texture.encoding
+        // (the colorSpace API was only added in r152). sRGBEncoding is what
+        // actually makes the real RGB texture render with correct colors.
+        tex.encoding = THREE.sRGBEncoding;
+        tex.flipY = NATURAL_TEXTURE_FLIP_Y; // matches existing mesh UV convention
+        rgbTexture = tex;
+        resolve(tex);
+      },
+      undefined,
+      () => resolve(null) // load failed — graceful fallback
+    );
+  });
+}
+
+// Apply the cached RGB texture to the existing reconstructed mesh's
+// materials. Prefers the existing material instance (JSON path and most GLB
+// meshes); only a GLB mesh carrying a non-MeshStandardMaterial gets a fresh
+// MeshStandardMaterial. Never creates duplicate meshes or touches geometry.
+function applyNaturalTexture(tex) {
+  currentMeshGroup.traverse((child) => {
+    if (!child.isMesh) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    for (const mat of mats) {
+      let target = mat;
+      if (!mat.isMeshStandardMaterial) {
+        const fresh = new THREE.MeshStandardMaterial({
+          map: tex, metalness: 0, roughness: 0.9, side: THREE.DoubleSide,
+        });
+        if (Array.isArray(child.material)) child.material = mats.map((m) => (m === mat ? fresh : m));
+        else child.material = fresh;
+        target = fresh;
+      }
+      target.map = tex;
+      target.metalness = 0;   // natural terrain — not shiny plastic
+      target.roughness = 0.9; // natural terrain — matte surface
+      target.needsUpdate = true;
+      if (!target.userData.naturalTextured) {
+        target.userData.naturalTextured = true;
+        naturalTexturedMats.push(target);
+      }
+    }
+  });
+}
+
+// Turn NATURAL 3D OFF: drop the map from the materials we textured, leaving
+// the mesh itself otherwise untouched (no rebuild, no re-download).
+function setNatural3d(on) {
+  if (!on) {
+    for (const mat of naturalTexturedMats) {
+      if (mat.userData.naturalTextured) {
+        mat.map = null;
+        mat.needsUpdate = true;
+        mat.userData.naturalTextured = false;
+      }
+    }
+    naturalTexturedMats.length = 0;
+    if (viewerHud.textContent === NATURAL_HUD_TEXT) viewerHud.style.display = 'none';
+  }
+  natural3dOn = on;
+  el('btnNatural').classList.toggle('active', on);
+}
+
+function showViewerHud(text) {
+  viewerHud.style.display = 'flex';
+  viewerHud.textContent = text;
+}
+
+async function toggleNatural3d() {
+  if (!currentMeshGroup) return; // no mesh yet — nothing to texture
+  if (natural3dOn) { setNatural3d(false); return; }
+
+  const tex = await loadNaturalTexture();
+  if (!tex) {
+    // Graceful fallback: keep the existing material/geometry presentation
+    // exactly as-is; show a non-blocking hint. Never throw.
+    showViewerHud('Natural RGB texture unavailable. Showing reconstructed geometry.');
+    return;
+  }
+  // NATURAL 3D owns presentation: hide points, clear wireframe. Camera and
+  // current framing are intentionally left untouched (RESET CAM frames only).
+  setPointsMode(false);
+  setWireframe(false);
+  applyNaturalTexture(tex);
+  natural3dOn = true;
+  el('btnNatural').classList.add('active');
+  showViewerHud(NATURAL_HUD_TEXT);
+}
+
 el('btnReset').addEventListener('click', () => { if (currentMeshGroup) frameObject(currentMeshGroup); });
+el('btnNatural').addEventListener('click', () => toggleNatural3d());
 el('btnWireframe').addEventListener('click', () => setWireframe(!wireframeOn));
 el('btnPoints').addEventListener('click', () => setPointsMode(!pointsOn));
 el('btnTrajectory').addEventListener('click', () => toggleTrajectory());
